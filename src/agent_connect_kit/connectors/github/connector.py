@@ -1,9 +1,9 @@
 from agent_connect_kit.connectors.base import Action, Connector
+from agent_connect_kit.connectors.github.actions import ALL_ACTIONS
 
 
 class GitHubConnector(Connector):
     name = "github"
 
     def actions(self) -> list[Action]:
-        # M5 adds github.list_repos, M6 adds github.create_issue.
-        return []
+        return list(ALL_ACTIONS)

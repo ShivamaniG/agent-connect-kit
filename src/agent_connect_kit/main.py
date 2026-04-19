@@ -8,6 +8,7 @@ from agent_connect_kit.connections.routes import router as connections_router
 from agent_connect_kit.connectors import get_connectors
 from agent_connect_kit.db import get_session
 from agent_connect_kit.logging_config import configure_logging, get_logger
+from agent_connect_kit.runtime.routes import router as actions_router
 
 configure_logging()
 log = get_logger(__name__)
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
         ]
 
     app.include_router(connections_router)
+    app.include_router(actions_router)
 
     log.info("app.started", env=settings.app_env, version=__version__)
     return app
