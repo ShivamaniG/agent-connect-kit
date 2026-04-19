@@ -1,65 +1,49 @@
 # Agent Connect Kit
 
-Open-source connector gateway that lets AI copilots and agentic apps securely connect to external tools like GitHub and Discord through a simple REST API and MCP-compatible interface. Ships with two connectors and 27 actions out of the box.
+Open-source connector gateway for AI agents and copilots.
+
+Build internal copilots and embed AI assistants once, then connect them to **GitHub**, **Discord**, and other tools through a REST API and MCP-compatible interfaces. Ships with **2 connectors and 37 actions** out of the box.
+
+---
 
 ## Why this exists
 
-AI engineers can build good agents, but connecting them to real tools is still painful. Every team ends up rebuilding OAuth, token handling, permission mapping, tool schemas, retries, logging, and per-user connection management for the same apps.
+AI engineers can build agents, but connecting them to real tools is still painful. Everyone rebuilds OAuth, token storage, permissions, tool schemas, retries, logging, and per-user connection management for the same apps.
 
-Agent Connect Kit aims to make that layer reusable.
+Agent Connect Kit turns that integration layer into a reusable platform, so you can focus on workflows instead of plumbing.
 
-## Vision
+---
 
-Build the developer-first connectivity layer for AI agents.
+## What ships out of the box
 
-The first goal is simple:
-- Connect a user account to GitHub.
-- Expose GitHub actions as safe tools.
-- Let any agent framework call those tools through MCP or a Python SDK.
-- Extend the same pattern to Microsoft Teams and other workplace tools.
+| | Connector | Actions | Auth model |
+|---|---|---|---|
+| 🟦 | **GitHub** | 22 — repos, issues, PRs, files, search, commits, stars, notifications, users, orgs | Per-user OAuth; encrypted tokens in Postgres |
+| 🟪 | **Discord** | 10 — send message, list guilds, list channels, read messages, add reaction | Silent bot token; one bot per gateway |
+
+Both connectors go through the same runtime — same retry logic, same audit log, same MCP exposure.
+
+### Also included
+
+- **MCP server (stdio)** — all 37 actions exposed as MCP tools for Claude Desktop, Cursor, VS Code Copilot, and Codex CLI.
+- **REST API** with `X-API-Key` auth, exponential-backoff retries, rate-limit handling.
+- **Local development** via `docker compose`: API, Postgres, Alembic migrations.
+- **Audit log** (`action_logs` table) records every call with args, result summary, latency, and status.
+- **Extensible** — adding a new connector is ~40 lines per action using the shared `Action` interface.
+
+---
 
 ## Who this is for
 
 - AI engineers building internal copilots.
 - SaaS startups embedding AI assistants into their products.
-- Developers who want self-hostable connector infrastructure instead of stitching together custom integrations for every agent project.
+- Independent devs who want self-hostable connector infrastructure instead of stitching together custom integrations for every agent project.
 
-## Problem statement
+---
 
-Today, agent builders often have to solve the same integration problems repeatedly:
-- OAuth setup and callback flows.
-- Access token storage and refresh.
-- Per-user account connections.
-- Tool schema definition.
-- API retries and rate-limit handling.
-- Safe execution and permission boundaries.
-- Tracing, logs, and auditability.
+## Quickstart — 3 minutes to a working gateway
 
-This project turns those repeated tasks into a reusable platform.
-
-## Initial product direction
-
-Agent Connect Kit starts as an open-source, self-hostable connector gateway focused on internal copilots.
-
-### Phase 1 (shipped)
-- **GitHub connector** — 22 actions across repos, issues, PRs, files, search, commits, stars, notifications, users, orgs. Per-user OAuth with encrypted token storage.
-- **Discord connector** — 5 actions (send message, list guilds, list channels, get channel messages, add reaction). Silent-bot pattern via `DISCORD_BOT_TOKEN`.
-- **MCP server** (stdio) — all actions exposed as MCP tools for Claude Desktop, Cursor, VS Code Copilot, Codex CLI.
-- REST API with `X-API-Key` auth, retries, rate-limit handling.
-- Local development via `docker compose`, Postgres + Alembic migrations.
-- Per-call audit log (`action_logs` table) with args, status, latency.
-
-### Phase 2 (roadmap)
-- Microsoft Teams connector.
-- Approval workflows for agent actions.
-- Fine-grained connector permissions.
-- Better dashboard and policy controls.
-
-## Quickstart
-
-Run the gateway locally in ~3 minutes.
-
-### 1. Register a GitHub OAuth App
+### 1. Register a GitHub OAuth App (optional but recommended)
 
 Go to https://github.com/settings/applications/new and fill in:
 
@@ -67,19 +51,33 @@ Go to https://github.com/settings/applications/new and fill in:
 - **Homepage URL**: `http://localhost:8000`
 - **Authorization callback URL**: `http://localhost:8000/connections/github/callback`
 
-After registering, copy the **Client ID** and generate a **Client Secret**.
+Copy the **Client ID** and generate a **Client Secret**.
 
-### 2. Configure and start the stack
+### 2. Register a Discord bot (optional but recommended)
+
+Go to https://discord.com/developers/applications → **New Application** → **Bot** tab → **Reset Token** → copy it.
+
+Then **OAuth2 → URL Generator**:
+- Scope: `bot`
+- Permissions: Send Messages, View Channels, Read Message History, Add Reactions
+
+Open the generated URL, pick your server, **Authorize**.
+
+### 3. Configure and start the stack
 
 ```bash
 git clone https://github.com/ShivamaniG/agent-connect-kit
 cd agent-connect-kit
 cp .env.example .env
-# Edit .env and fill in:
-#   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
-#   APP_SECRET   (generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
-#   API_KEY      (generate: python -c "import secrets; print(secrets.token_urlsafe(32))")
+```
 
+Edit `.env` and fill in:
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` (from step 1)
+- `DISCORD_BOT_TOKEN` (from step 2)
+- `APP_SECRET` — generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+- `API_KEY` — generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+
+```bash
 docker compose up -d --build
 docker compose exec api uv run alembic upgrade head
 curl http://localhost:8000/health
@@ -87,36 +85,19 @@ curl http://localhost:8000/health
 
 Expect `{"status":"ok","version":"0.1.0","env":"development"}`.
 
-### 3a. Connect a GitHub account once
+### 4. Connect a GitHub user once
 
-Open in your browser (replace `shiva` with any identifier you'll use consistently):
+Open in your browser (pick any identifier for `user_id` and reuse it everywhere):
 
 ```
 http://localhost:8000/connections/github/start?user_id=shiva
 ```
 
-Click **Authorize**. Your encrypted GitHub token is now stored.
+Click **Authorize**. The encrypted token is now stored.
 
-### 3b. Set up the Discord bot
+### 5. Call an action
 
-Discord uses a **silent bot** pattern — one bot per gateway, shared across users. Skip this section if you only want GitHub.
-
-1. Go to https://discord.com/developers/applications → **New Application**.
-2. Bot tab → **Reset Token** → copy the token.
-3. OAuth2 → URL Generator → tick `bot` scope and the permissions you need (Send Messages, View Channels, Read Message History, Add Reactions, etc.). Copy the generated URL, open it, pick your server, **Authorize**.
-4. Add to `.env`:
-   ```
-   DISCORD_BOT_TOKEN=your-bot-token
-   ```
-5. Recreate the API container so it picks up the env var:
-   ```bash
-   docker compose up -d --force-recreate api
-   ```
-
-Verify: `curl -X POST http://localhost:8000/actions/discord.list_guilds -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{"user_id":"shiva","args":{}}'` should return your server.
-
-### 4. Call an action
-
+**GitHub — list your repos:**
 ```bash
 curl -s -X POST http://localhost:8000/actions/github.list_repos \
   -H "X-API-Key: $API_KEY" \
@@ -124,11 +105,29 @@ curl -s -X POST http://localhost:8000/actions/github.list_repos \
   -d '{"user_id":"shiva","args":{"per_page":5}}'
 ```
 
-Real repos come back. Every call is audited in the `action_logs` table.
+**Discord — list servers your bot is in:**
+```bash
+curl -s -X POST http://localhost:8000/actions/discord.list_guilds \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"shiva","args":{}}'
+```
+
+**Discord — post a message:**
+```bash
+curl -s -X POST http://localhost:8000/actions/discord.send_message \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"shiva","args":{"channel_id":"YOUR_CHANNEL_ID","content":"hello from the gateway"}}'
+```
+
+Every call is audited in the `action_logs` table.
+
+---
 
 ## Connect your agent
 
-The gateway exposes all actions via **REST** and an **MCP server** (stdio). Pick your integration below.
+All 37 actions are callable via **REST** or **MCP**. Pick your integration.
 
 ### Claude Desktop
 
@@ -151,11 +150,11 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or
 }
 ```
 
-Fully quit Claude Desktop (system tray → Quit) and reopen. The plug icon at the bottom of the chat will show `agent-connect-kit · 27 tools`.
+Fully quit Claude Desktop (system tray → Quit) and reopen. The 🔌 icon should show `agent-connect-kit · 37 tools`.
 
 ### Cursor
 
-Save to `.cursor/mcp.json` in your project, or global `~/.cursor/mcp.json`:
+Save to `.cursor/mcp.json` in your project (or global `~/.cursor/mcp.json`):
 
 ```json
 {
@@ -177,8 +176,7 @@ Reload Cursor (`Ctrl+Shift+P` → Reload Window).
 
 ### GitHub Copilot in VS Code
 
-1. In VS Code settings, enable `chat.mcp.enabled`.
-2. Create `.vscode/mcp.json`:
+Enable `chat.mcp.enabled` in VS Code settings, then create `.vscode/mcp.json`:
 
 ```json
 {
@@ -197,11 +195,11 @@ Reload Cursor (`Ctrl+Shift+P` → Reload Window).
 }
 ```
 
-3. Reload Window. In Copilot Chat, switch to **Agent** mode — 27 tools appear under the tools icon.
+Reload Window. In Copilot Chat, switch to **Agent** mode → 37 tools appear.
 
 ### OpenAI Codex CLI
 
-Edit `~/.codex/config.toml` (or `C:\Users\<you>\.codex\config.toml`):
+Edit `~/.codex/config.toml` (Linux/macOS) or `C:\Users\<you>\.codex\config.toml` (Windows):
 
 ```toml
 [mcp_servers.agent-connect-kit]
@@ -223,24 +221,95 @@ USER_ID = "shiva"
 # Discover tools
 tools = httpx.get(f"{GATEWAY}/actions", headers={"X-API-Key": API_KEY}).json()
 
-# Execute one
-result = httpx.post(
+# Execute one — GitHub
+repos = httpx.post(
     f"{GATEWAY}/actions/github.list_repos",
     headers={"X-API-Key": API_KEY},
     json={"user_id": USER_ID, "args": {"per_page": 5}},
 ).json()
+
+# Execute one — Discord
+httpx.post(
+    f"{GATEWAY}/actions/discord.send_message",
+    headers={"X-API-Key": API_KEY},
+    json={"user_id": USER_ID, "args": {"channel_id": "...", "content": "hi"}},
+)
 ```
 
-### Notes
+---
 
-- Every MCP integration uses the same `docker exec ... python -m agent_connect_kit.mcp` command. The MCP server reuses the REST action runtime, so all logs and audit rows are identical across surfaces.
-- `ACK_USER_ID` in the MCP client's env pins the session to a single end user. One MCP client config = one user's actions.
-- For multi-user or remote deployments, an HTTP transport variant is planned.
+## How it works
+
+```
+Agent / SDK / MCP client
+        │
+        │  REST or MCP stdio
+        ▼
+┌─────────────────────────────────┐
+│       Agent Connect Kit         │
+│ ┌─────────────────────────────┐ │
+│ │  Action runtime (executor)  │ │  validate → fetch creds → call → log
+│ └─────────┬───────────────────┘ │
+│ ┌─────────▼───────────────────┐ │
+│ │     Connector registry      │ │  GitHub (per-user OAuth)
+│ │                             │ │  Discord (service bot token)
+│ └─────────┬───────────────────┘ │
+│           │                     │
+│  Postgres │  Connections (encrypted tokens)
+│           │  ActionLog    (every call audited)
+└───────────┼─────────────────────┘
+            ▼
+   GitHub API / Discord API / ...
+```
+
+Two credential patterns are supported:
+
+- **Per-user OAuth** (GitHub) — each end user connects their own account via browser. Tokens are encrypted with Fernet and stored in Postgres.
+- **Service credentials** (Discord bot) — one provider-wide token in `.env`. Useful when the agent acts as itself (e.g., a bot in a server) rather than on behalf of individual users.
+
+Adding a new connector is ~40 lines per action via the `Action` dataclass + registry pattern.
+
+---
+
+## Architecture
+
+- **Backend**: FastAPI + uvicorn, Python 3.12
+- **Package manager**: `uv`
+- **Database**: Postgres 16, SQLAlchemy 2.0 async, Alembic migrations
+- **HTTP client**: `httpx` async, shared retry/backoff helpers per provider
+- **Validation**: Pydantic v2
+- **Crypto**: `cryptography.Fernet` for token encryption at rest
+- **MCP**: official `mcp` Python SDK (stdio)
+- **Logging**: `structlog` JSON on stderr
+- **Packaging**: `docker-compose` (api + postgres)
+
+---
+
+## Roadmap
+
+### Shipped
+- GitHub connector (22 actions)
+- Discord connector (10 actions)
+- MCP stdio server
+- REST API with audit logging
+- Self-host via docker compose
+
+### Next
+- **More Discord actions** — threads, roles, voice state, message edits
+- **Microsoft Teams connector** — Graph API + token refresh
+- **Approval workflows** — human-in-the-loop for sensitive writes
+- **HTTP MCP transport** — for multi-user hosted deployments
+- **Python SDK** — typed wrapper over REST
+- **Admin dashboard** — view connections, revoke tokens, browse audit log
+
+---
 
 ## Contributing
 
-Contributions, ideas, and design feedback will be welcome once the first scaffold is stable.
+Contributions, issues, and design feedback are welcome. The connector pattern is designed so you can add a new provider without touching the runtime — see `src/agent_connect_kit/connectors/discord/` for the smallest complete example.
+
+---
 
 ## License
 
-Planned: MIT
+MIT.
