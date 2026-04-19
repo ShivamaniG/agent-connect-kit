@@ -7,4 +7,4 @@ class ActionContext:
     access_token: str
     user_id: int
     user_external_id: str
-    connection_id: int
+    connection_id: int | None

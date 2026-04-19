@@ -13,3 +13,12 @@ class UserNotConnected(ActionError):
         super().__init__(f"user {user_external_id!r} has no {provider} connection")
         self.user_external_id = user_external_id
         self.provider = provider
+
+
+class ProviderNotConfigured(ActionError):
+    def __init__(self, provider: str, detail: str = "") -> None:
+        message = f"provider {provider!r} is not configured"
+        if detail:
+            message += f": {detail}"
+        super().__init__(message)
+        self.provider = provider

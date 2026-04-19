@@ -1,6 +1,6 @@
 # Agent Connect Kit
 
-Open-source connector gateway that lets AI copilots and agentic apps securely connect to external tools like GitHub and Microsoft Teams through a simple SDK and MCP-compatible interface.
+Open-source connector gateway that lets AI copilots and agentic apps securely connect to external tools like GitHub and Discord through a simple REST API and MCP-compatible interface. Ships with two connectors and 27 actions out of the box.
 
 ## Why this exists
 
@@ -41,14 +41,15 @@ This project turns those repeated tasks into a reusable platform.
 
 Agent Connect Kit starts as an open-source, self-hostable connector gateway focused on internal copilots.
 
-### Phase 1
-- GitHub connector.
-- Python SDK.
-- MCP server mode.
-- Local development workflow.
-- Connection management and execution logs.
+### Phase 1 (shipped)
+- **GitHub connector** — 22 actions across repos, issues, PRs, files, search, commits, stars, notifications, users, orgs. Per-user OAuth with encrypted token storage.
+- **Discord connector** — 5 actions (send message, list guilds, list channels, get channel messages, add reaction). Silent-bot pattern via `DISCORD_BOT_TOKEN`.
+- **MCP server** (stdio) — all actions exposed as MCP tools for Claude Desktop, Cursor, VS Code Copilot, Codex CLI.
+- REST API with `X-API-Key` auth, retries, rate-limit handling.
+- Local development via `docker compose`, Postgres + Alembic migrations.
+- Per-call audit log (`action_logs` table) with args, status, latency.
 
-### Phase 2
+### Phase 2 (roadmap)
 - Microsoft Teams connector.
 - Approval workflows for agent actions.
 - Fine-grained connector permissions.
@@ -96,6 +97,24 @@ http://localhost:8000/connections/github/start?user_id=shiva
 
 Click **Authorize**. Your encrypted GitHub token is now stored.
 
+### 3b. (optional) Set up the Discord bot
+
+Discord uses a **silent bot** pattern — one bot per gateway, shared across users. Skip this section if you only want GitHub.
+
+1. Go to https://discord.com/developers/applications → **New Application**.
+2. Bot tab → **Reset Token** → copy the token.
+3. OAuth2 → URL Generator → tick `bot` scope and the permissions you need (Send Messages, View Channels, Read Message History, Add Reactions, etc.). Copy the generated URL, open it, pick your server, **Authorize**.
+4. Add to `.env`:
+   ```
+   DISCORD_BOT_TOKEN=your-bot-token
+   ```
+5. Recreate the API container so it picks up the env var:
+   ```bash
+   docker compose up -d --force-recreate api
+   ```
+
+Verify: `curl -X POST http://localhost:8000/actions/discord.list_guilds -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" -d '{"user_id":"shiva","args":{}}'` should return your server.
+
 ### 4. Call an action
 
 ```bash
@@ -132,7 +151,7 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or
 }
 ```
 
-Fully quit Claude Desktop (system tray → Quit) and reopen. The plug icon at the bottom of the chat will show `agent-connect-kit · 22 tools`.
+Fully quit Claude Desktop (system tray → Quit) and reopen. The plug icon at the bottom of the chat will show `agent-connect-kit · 27 tools`.
 
 ### Cursor
 
@@ -178,7 +197,7 @@ Reload Cursor (`Ctrl+Shift+P` → Reload Window).
 }
 ```
 
-3. Reload Window. In Copilot Chat, switch to **Agent** mode — 22 tools appear under the tools icon.
+3. Reload Window. In Copilot Chat, switch to **Agent** mode — 27 tools appear under the tools icon.
 
 ### OpenAI Codex CLI
 

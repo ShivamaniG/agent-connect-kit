@@ -7,6 +7,7 @@ from agent_connect_kit.connectors.base import (
     get_connectors,
     register,
 )
+from agent_connect_kit.connectors import discord  # noqa: F401 — triggers registration
 from agent_connect_kit.connectors import github  # noqa: F401 — triggers registration
 
 __all__ = [

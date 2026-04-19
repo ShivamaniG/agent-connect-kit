@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     github_redirect_uri: str
     github_oauth_scopes: str = Field(default="repo,read:org")
 
+    # Discord bot (silent bot pattern; optional)
+    discord_bot_token: str | None = None
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

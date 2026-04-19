@@ -5,7 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agent_connect_kit.config import get_settings
 from agent_connect_kit.connectors import get_actions
 from agent_connect_kit.db import get_session
-from agent_connect_kit.runtime.errors import ActionNotFound, UserNotConnected
+from agent_connect_kit.runtime.errors import (
+    ActionNotFound,
+    ProviderNotConfigured,
+    UserNotConnected,
+)
 from agent_connect_kit.runtime.executor import execute
 
 
@@ -50,6 +54,8 @@ async def run_action(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except UserNotConnected as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ProviderNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except httpx.HTTPStatusError as exc:
         raise HTTPException(
             status_code=502,
