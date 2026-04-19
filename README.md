@@ -87,7 +87,7 @@ curl http://localhost:8000/health
 
 Expect `{"status":"ok","version":"0.1.0","env":"development"}`.
 
-### 3. Connect a GitHub account once
+### 3a. Connect a GitHub account once
 
 Open in your browser (replace `shiva` with any identifier you'll use consistently):
 
@@ -97,7 +97,7 @@ http://localhost:8000/connections/github/start?user_id=shiva
 
 Click **Authorize**. Your encrypted GitHub token is now stored.
 
-### 3b. (optional) Set up the Discord bot
+### 3b. Set up the Discord bot
 
 Discord uses a **silent bot** pattern — one bot per gateway, shared across users. Skip this section if you only want GitHub.
 
