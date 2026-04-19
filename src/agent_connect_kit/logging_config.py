@@ -5,10 +5,12 @@ import structlog
 
 
 def configure_logging(level: str = "INFO") -> None:
+    # Route all logs to stderr so stdio MCP (which reserves stdout for JSON-RPC) works.
     logging.basicConfig(
         format="%(message)s",
-        stream=sys.stdout,
+        stream=sys.stderr,
         level=getattr(logging, level.upper(), logging.INFO),
+        force=True,
     )
 
     structlog.configure(

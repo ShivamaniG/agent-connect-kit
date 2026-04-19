@@ -29,6 +29,7 @@ services:
       - ./src:/app/src
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
+      - ./scripts:/app/scripts
     depends_on:
       postgres:
         condition: service_healthy

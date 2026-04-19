@@ -17,6 +17,7 @@ dependencies = [
     "httpx>=0.28",
     "structlog>=24.4",
     "cryptography>=43.0",
+    "mcp>=1.2",
 ]
 
 [project.optional-dependencies]

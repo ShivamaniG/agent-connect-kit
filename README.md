@@ -54,6 +54,170 @@ Agent Connect Kit starts as an open-source, self-hostable connector gateway focu
 - Fine-grained connector permissions.
 - Better dashboard and policy controls.
 
+## Quickstart
+
+Run the gateway locally in ~3 minutes.
+
+### 1. Register a GitHub OAuth App
+
+Go to https://github.com/settings/applications/new and fill in:
+
+- **Application name**: `Agent Connect Kit (local dev)`
+- **Homepage URL**: `http://localhost:8000`
+- **Authorization callback URL**: `http://localhost:8000/connections/github/callback`
+
+After registering, copy the **Client ID** and generate a **Client Secret**.
+
+### 2. Configure and start the stack
+
+```bash
+git clone https://github.com/ShivamaniG/agent-connect-kit
+cd agent-connect-kit
+cp .env.example .env
+# Edit .env and fill in:
+#   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
+#   APP_SECRET   (generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+#   API_KEY      (generate: python -c "import secrets; print(secrets.token_urlsafe(32))")
+
+docker compose up -d --build
+docker compose exec api uv run alembic upgrade head
+curl http://localhost:8000/health
+```
+
+Expect `{"status":"ok","version":"0.1.0","env":"development"}`.
+
+### 3. Connect a GitHub account once
+
+Open in your browser (replace `shiva` with any identifier you'll use consistently):
+
+```
+http://localhost:8000/connections/github/start?user_id=shiva
+```
+
+Click **Authorize**. Your encrypted GitHub token is now stored.
+
+### 4. Call an action
+
+```bash
+curl -s -X POST http://localhost:8000/actions/github.list_repos \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"shiva","args":{"per_page":5}}'
+```
+
+Real repos come back. Every call is audited in the `action_logs` table.
+
+## Connect your agent
+
+The gateway exposes all actions via **REST** and an **MCP server** (stdio). Pick your integration below.
+
+### Claude Desktop
+
+Edit `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+
+```json
+{
+  "mcpServers": {
+    "agent-connect-kit": {
+      "command": "docker",
+      "args": [
+        "exec", "-i",
+        "-e", "ACK_USER_ID=shiva",
+        "agentconnectkit-api-1",
+        "uv", "run", "python", "-m", "agent_connect_kit.mcp"
+      ]
+    }
+  }
+}
+```
+
+Fully quit Claude Desktop (system tray → Quit) and reopen. The plug icon at the bottom of the chat will show `agent-connect-kit · 22 tools`.
+
+### Cursor
+
+Save to `.cursor/mcp.json` in your project, or global `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "agent-connect-kit": {
+      "command": "docker",
+      "args": [
+        "exec", "-i",
+        "-e", "ACK_USER_ID=shiva",
+        "agentconnectkit-api-1",
+        "uv", "run", "python", "-m", "agent_connect_kit.mcp"
+      ]
+    }
+  }
+}
+```
+
+Reload Cursor (`Ctrl+Shift+P` → Reload Window).
+
+### GitHub Copilot in VS Code
+
+1. In VS Code settings, enable `chat.mcp.enabled`.
+2. Create `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "agent-connect-kit": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "exec", "-i",
+        "-e", "ACK_USER_ID=shiva",
+        "agentconnectkit-api-1",
+        "uv", "run", "python", "-m", "agent_connect_kit.mcp"
+      ]
+    }
+  }
+}
+```
+
+3. Reload Window. In Copilot Chat, switch to **Agent** mode — 22 tools appear under the tools icon.
+
+### OpenAI Codex CLI
+
+Edit `~/.codex/config.toml` (or `C:\Users\<you>\.codex\config.toml`):
+
+```toml
+[mcp_servers.agent-connect-kit]
+command = "docker"
+args = ["exec", "-i", "-e", "ACK_USER_ID=shiva", "agentconnectkit-api-1", "uv", "run", "python", "-m", "agent_connect_kit.mcp"]
+```
+
+Restart Codex.
+
+### Custom agent (REST, any language)
+
+```python
+import httpx
+
+GATEWAY = "http://localhost:8000"
+API_KEY = "..."
+USER_ID = "shiva"
+
+# Discover tools
+tools = httpx.get(f"{GATEWAY}/actions", headers={"X-API-Key": API_KEY}).json()
+
+# Execute one
+result = httpx.post(
+    f"{GATEWAY}/actions/github.list_repos",
+    headers={"X-API-Key": API_KEY},
+    json={"user_id": USER_ID, "args": {"per_page": 5}},
+).json()
+```
+
+### Notes
+
+- Every MCP integration uses the same `docker exec ... python -m agent_connect_kit.mcp` command. The MCP server reuses the REST action runtime, so all logs and audit rows are identical across surfaces.
+- `ACK_USER_ID` in the MCP client's env pins the session to a single end user. One MCP client config = one user's actions.
+- For multi-user or remote deployments, an HTTP transport variant is planned.
+
 ## Core ideas
 
 ### 1. Connector abstraction
